@@ -1,0 +1,5 @@
+Request ID,Datetime,Endpoint Triggered,Client IP Address,Response Time,Status Code,Successful
+9d37cf45e2174331a112b10261251f13,2025-12-24T16:40:57.622596+00:00,http://localhost:8000/generate/text?prompt=Tell+me+a+joke%3f,127.0.0.1,6.9461,200,True
+e859ba73f4024166b6bcc9f15036e1d8,2025-12-24T16:41:10.162766+00:00,http://localhost:8000/generate/text?prompt=How+do+I+create+a+FastAPI+endpoint%3f,127.0.0.1,4.6226,200,True
+16e8b2ddb6284b19811fc86e523d7afa,2025-12-24T16:51:27.470845+00:00,http://localhost:8000/generate/text?prompt=How+do+I+create+a+FastAPI+endpoint%3f,127.0.0.1,6.5053,200,True
+a0d43632da954365a34b9a79e22d0e2d,2025-12-24T16:53:55.951995+00:00,http://localhost:8000/generate/text?prompt=Tell+me+a+joke,127.0.0.1,7.4308,200,True

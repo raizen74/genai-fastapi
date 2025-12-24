@@ -1,0 +1,7 @@
+curl -G "http://localhost:8000/generate/text" --data-urlencode "prompt=How do I create a FastAPI endpoint?"
+
+uv run streamlit run ./streamlit/client_text.py
+uv run streamlit run ./streamlit/client_audio.py
+uv run streamlit run ./streamlit/client_image.py
+
+uv run bentoml serve building_genai_services.bentoml.bento:Generate
