@@ -8,6 +8,7 @@ dependencies = [
     "accelerate>=1.10.1",
     "av>=15.1.0",
     "bentoml>=1.4.31",
+    "bs4>=0.0.2",
     "diffusers>=0.36.0",
     "fastapi>=0.127.0",
     "loguru>=0.7.3",

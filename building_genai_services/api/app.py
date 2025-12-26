@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from PIL import Image
 
-# from building_genai_services.dependencies import get_urls_content
+from building_genai_services.dependencies import get_urls_content
 from building_genai_services.models import (
     generate_3d_geometry,
     generate_audio,
@@ -127,15 +127,16 @@ async def monitor_service(
 async def serve_text_to_text_controller(
     request: Request,
     body: TextModelRequest = Body(...),
-    # urls_content: str = Depends(get_urls_content),
+    urls_content: str = Depends(get_urls_content),
 ) -> TextModelResponse:
     logger.info(f"{body.model =}")
+    logger.info(f"{urls_content =}")
     if body.model not in ["tinyLlama", "gemma2b"]:
         raise HTTPException(
             detail=f"Model {body.model} is not supported",
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    # prompt = body.prompt + " " + urls_content
+    prompt = body.prompt + " " + urls_content
     output = generate_text(models["text2text"], body.prompt, body.temperature)
     res = TextModelResponse(
         model=body.model,
