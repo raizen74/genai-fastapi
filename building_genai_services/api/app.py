@@ -9,6 +9,7 @@ from uuid import uuid4
 import httpx
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
+from loguru import logger
 from PIL import Image
 
 # from building_genai_services.dependencies import get_urls_content
@@ -128,7 +129,7 @@ async def serve_text_to_text_controller(
     body: TextModelRequest = Body(...),
     # urls_content: str = Depends(get_urls_content),
 ) -> TextModelResponse:
-    print(body.model)
+    logger.info(f"{body.model =}")
     if body.model not in ["tinyLlama", "gemma2b"]:
         raise HTTPException(
             detail=f"Model {body.model} is not supported",
@@ -136,13 +137,16 @@ async def serve_text_to_text_controller(
         )
     # prompt = body.prompt + " " + urls_content
     output = generate_text(models["text2text"], body.prompt, body.temperature)
-    return TextModelResponse(
+    res = TextModelResponse(
         model=body.model,
         temperature=body.temperature,
-        price=5,
         content=output,
         ip=request.client.host,
     )
+
+    logger.info(f"{res.model_dump =}")
+    logger.info(f"{res.model_dump_json =}")
+    return res
 
 
 @app.get(

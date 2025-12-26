@@ -5,3 +5,7 @@ uv run streamlit run ./streamlit/client_audio.py
 uv run streamlit run ./streamlit/client_image.py
 
 uv run bentoml serve building_genai_services.bentoml.bento:Generate
+
+curl localhost:8000/generate/text \
+  -H "Content-Type: application/json" \
+  -d '{"model":"tinyLlama","prompt":"Write a friendly 2-sentence introduction to a newsletter about AI.","temperature":0.2}

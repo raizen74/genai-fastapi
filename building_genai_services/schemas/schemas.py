@@ -1,17 +1,20 @@
 from datetime import datetime
 from typing import Annotated, Literal, TypeAlias
 from uuid import uuid4
-from building_genai_services.utils import count_tokens
+
+from loguru import logger
 from pydantic import (
+    AfterValidator,
     BaseModel,
     Field,
-    PositiveInt,
-    AfterValidator,
-    validate_call,
-    computed_field,
-    IPvAnyAddress,
     HttpUrl,
+    IPvAnyAddress,
+    PositiveInt,
+    computed_field,
+    validate_call,
 )
+
+from building_genai_services.utils import count_tokens
 
 VoicePresets = Literal["v2/en_speaker_1", "v2/en_speaker_9"]
 
@@ -21,10 +24,12 @@ PriceTable: TypeAlias = dict[SupportedTextModels, float]
 price_table: PriceTable = {"tinyLlama": 0.0030, "gemma2b": 0.0200}
 
 ImageSize = Annotated[
-    tuple[PositiveInt, PositiveInt], "Width and height of an image in pixels"
+    tuple[PositiveInt, PositiveInt],
+    "Width and height of an image in pixels",
 ]
 SupportedImageModels = Annotated[
-    Literal["tinysd", "sd1.5"], "Supported Image Generation Models"
+    Literal["tinysd", "sd1.5"],
+    "Supported Image Generation Models",
 ]
 
 
@@ -39,11 +44,12 @@ def is_square_image(value: ImageSize) -> ImageSize:
 
 @validate_call
 def is_valid_inference_step(
-    num_inference_steps: int, model: SupportedImageModels
+    num_inference_steps: int,
+    model: SupportedImageModels,
 ) -> int:
     if model == "tinysd" and num_inference_steps > 2000:
         raise ValueError(
-            "TinySD model cannot have more than 2000 inference steps"
+            "TinySD model cannot have more than 2000 inference steps",
         )
     return num_inference_steps
 
@@ -52,7 +58,7 @@ OutputSize = Annotated[ImageSize, AfterValidator(is_square_image)]
 InferenceSteps = Annotated[
     int,
     AfterValidator(
-        lambda v, values: is_valid_inference_step(v, values["model"])
+        lambda v, values: is_valid_inference_step(v, values["model"]),
     ),
 ]
 
@@ -62,7 +68,9 @@ class ModelRequest(BaseModel):
 
 
 class ModelResponse(BaseModel):
-    request_id: Annotated[str, Field(default_factory=lambda: uuid4().hex)]
+    request_id: Annotated[
+        str, Field(default_factory=lambda: uuid4().hex)
+    ]  # default_factory creates uuid4 on the fly
     # no defaults set for ip field
     # raise ValidationError if a valid IP address or None is not provided.
     ip: Annotated[str, IPvAnyAddress] | None
@@ -79,17 +87,16 @@ class TextModelRequest(BaseModel):
 class TextModelResponse(ModelResponse):
     model: SupportedTextModels
     temperature: Annotated[float, Field(ge=0.0, le=1.0, default=0.0)]
-    price: Annotated[float, Field(ge=0, default=0.0)]
+    # price: Annotated[float, Field(ge=0, default=0.0)]
 
-    @property
     @computed_field
     def tokens(self) -> TokenCount:
-        return count_tokens(self.content)
+        # content may be None; ensure we pass a string to the tokenizer
+        return count_tokens(self.content or "")
 
-    @property
     @computed_field
     def cost(self) -> float:
-        return self.price * self.tokens
+        return price_table[self.model] * self.tokens
 
 
 class ImageModelRequest(ModelRequest):
