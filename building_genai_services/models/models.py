@@ -29,10 +29,12 @@ Always respond in markdown.
 
 
 def load_text_model():
+    # prefer lower-precision dtypes only on accelerators
+    torch_dtype = torch.bfloat16 if device.type in ("mps", "cuda") else torch.float32
     pipe = pipeline(
         "text-generation",
         model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-        dtype=torch.bfloat16,
+        dtype=torch_dtype,
         # Note: device_map="auto" is often better for M-series chips
         device=device,
     )
@@ -80,9 +82,12 @@ def generate_audio(
 
 
 def load_image_model() -> StableDiffusionInpaintPipelineLegacy:
+    # Use float32 on CPU, allow float16 on accelerators
+    torch_dtype = torch.float16 if device.type in ("mps", "cuda") else torch.float32
     pipe = DiffusionPipeline.from_pretrained(
-        "segmind/tiny-sd", torch_dtype=torch.float32, device=device
-    )
+        "segmind/tiny-sd", torch_dtype=torch_dtype, device=device,
+        )
+
     return pipe
 
 
@@ -92,18 +97,22 @@ def generate_image(pipe: StableDiffusionInpaintPipelineLegacy, prompt: str) -> I
 
 
 def load_video_model() -> StableVideoDiffusionPipeline:
+    # video pipelines often expect float16 on GPUs; fall back gracefully on CPU
+    torch_dtype = torch.float16 if device.type in ("mps", "cuda") else torch.float32
+    variant = "fp16" if device.type in ("mps", "cuda") else None
     pipe = StableVideoDiffusionPipeline.from_pretrained(
         "stabilityai/stable-video-diffusion-img2vid",
-        torch_dtype=torch.float16,
-        variant="fp16",
+        torch_dtype=torch_dtype,
+        variant=variant,
         device=device,
     )
     return pipe
 
 
 def generate_video(
-    pipe: StableVideoDiffusionPipeline, image: Image.Image, num_frames: int = 25
-) -> list[Image.Image]:
+    pipe: StableVideoDiffusionPipeline, image: Image.Image, num_frames: int = 25,
+        ) -> list[Image.Image]:
+
     image = image.resize((1024, 576))
     generator = torch.manual_seed(42)
     frames = pipe(image, decode_chunk_size=8, generator=generator, num_frames=num_frames).frames[0]
@@ -114,8 +123,9 @@ def load_3d_model() -> ShapEPipeline:
     return pipe
 
 
+
 def generate_3d_geometry(
-    pipe: ShapEPipeline, prompt: str, num_inference_steps: int
+    pipe: ShapEPipeline, prompt: str, num_inference_steps: int,
 ):
     images = pipe(
         prompt,

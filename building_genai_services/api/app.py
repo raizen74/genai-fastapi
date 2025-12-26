@@ -7,10 +7,11 @@ from io import BytesIO
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, File, Request, Response, status
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from PIL import Image
 
+# from building_genai_services.dependencies import get_urls_content
 from building_genai_services.models import (
     generate_3d_geometry,
     generate_audio,
@@ -23,7 +24,7 @@ from building_genai_services.models import (
     load_text_model,
     load_video_model,
 )
-from building_genai_services.schemas import VoicePresets
+from building_genai_services.schemas import TextModelRequest, TextModelResponse, VoicePresets
 from building_genai_services.utils import (
     audio_array_to_buffer,
     export_to_video_buffer,
@@ -43,6 +44,7 @@ models = {}
 #     yield
 
 #     ...  # Run cleanup code here
+
 
 #     models.clear()
 @asynccontextmanager
@@ -84,7 +86,8 @@ csv_header = [
 
 @app.middleware("http")
 async def monitor_service(
-    req: Request, call_next: Callable[[Request], Awaitable[Response]],
+    req: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
     request_id = uuid4().hex
     request_datetime = datetime.now(timezone.utc).isoformat()
@@ -110,12 +113,36 @@ async def monitor_service(
         )
     return response
 
-@app.get("/generate/text")
-def serve_language_model_controller(prompt: str) -> str:
-    # pipe = load_text_model()
-    # output = generate_text(pipe, prompt)
-    output = generate_text(models["text2text"], prompt) # model loaded in lifespan
-    return output
+
+# @app.get("/generate/text")
+# def serve_text_to_text_controller(prompt: str) -> str:
+#     # pipe = load_text_model()
+#     # output = generate_text(pipe, prompt)
+#     output = generate_text(models["text2text"], prompt) # model loaded in lifespan
+#     return output
+
+
+@app.post("/generate/text", response_model_exclude_defaults=True)
+async def serve_text_to_text_controller(
+    request: Request,
+    body: TextModelRequest = Body(...),
+    # urls_content: str = Depends(get_urls_content),
+) -> TextModelResponse:
+    print(body.model)
+    if body.model not in ["tinyLlama", "gemma2b"]:
+        raise HTTPException(
+            detail=f"Model {body.model} is not supported",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    # prompt = body.prompt + " " + urls_content
+    output = generate_text(models["text2text"], body.prompt, body.temperature)
+    return TextModelResponse(
+        model=body.model,
+        temperature=body.temperature,
+        price=5,
+        content=output,
+        ip=request.client.host,
+    )
 
 
 @app.get(
@@ -134,6 +161,7 @@ def serve_text_to_audio_model_controller(
         media_type="audio/wav",
     )
 
+
 @app.get(
     "/generate/image",
     responses={status.HTTP_200_OK: {"content": {"image/png": {}}}},
@@ -143,6 +171,7 @@ def serve_text_to_image_model_controller(prompt: str):
     pipe = load_image_model()
     output = generate_image(pipe, prompt)
     return Response(content=img_to_bytes(output), media_type="image/png")
+
 
 @app.post(
     "/generate/video",
@@ -166,6 +195,7 @@ def serve_text_to_3d_model_controller(
     response.headers["Content-Disposition"] = f"attachment; filename={prompt}.obj"
     return response
 
+
 @app.get(
     "/generate/bentoml/image",
     responses={status.HTTP_200_OK: {"content": {"image/png": {}}}},
@@ -174,6 +204,7 @@ def serve_text_to_3d_model_controller(
 async def serve_bentoml_text_to_image_controller(prompt: str):
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:5000/generate", json={"prompt": prompt},
+            "http://localhost:5000/generate",
+            json={"prompt": prompt},
         )
     return Response(content=response.content, media_type="image/png")

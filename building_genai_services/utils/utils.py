@@ -2,7 +2,7 @@
 # import tempfile
 from io import BytesIO
 # from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeAlias
 
 import av
 import numpy as np
@@ -11,7 +11,8 @@ import soundfile
 # import torch
 # from diffusers.pipelines.shap_e.renderer import MeshDecoderOutput
 from PIL import Image
-
+from loguru import logger
+import tiktoken
 
 def audio_array_to_buffer(audio_array: np.array, sample_rate: int) -> BytesIO:
     buffer = BytesIO()
@@ -42,7 +43,12 @@ def export_to_video_buffer(images: list[Image.Image]) -> BytesIO:
     output.mux(packet)
     return buffer
 
-
+def count_tokens(text: str | None) -> int:
+    if text is None:
+        logger.warning("Response is None. Assuming 0 tokens used")
+        return 0
+    enc = tiktoken.encoding_for_model("gpt-4o")
+    return len(enc.encode(text))
 # def mesh_to_obj_buffer(mesh: MeshDecoderOutput) -> BytesIO:
 #     mesh_o3d = o3d.geometry.TriangleMesh()
 #     mesh_o3d.vertices = o3d.utility.Vector3dVector(mesh.verts.cpu().detach().numpy())
