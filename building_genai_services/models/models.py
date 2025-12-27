@@ -1,3 +1,4 @@
+import aiohttp
 import numpy as np
 import torch
 from diffusers import (
@@ -6,6 +7,7 @@ from diffusers import (
     StableDiffusionInpaintPipelineLegacy,
     StableVideoDiffusionPipeline,
 )
+from loguru import logger
 from PIL import Image
 from transformers import AutoModel, AutoProcessor, BarkModel, BarkProcessor, Pipeline, pipeline
 
@@ -63,6 +65,33 @@ def generate_text(pipe: Pipeline, prompt: str, temperature: float = 0.7) -> str:
     return output
 
 
+async def generate_text_vllm(prompt: str, temperature: float = 0.7) -> str:
+    """Use the vLLM API server with Open AI compatible schema"""
+    system_prompt = "You are an AI assistant"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt},
+    ]
+    data = {"temperature": temperature, "messages": messages}
+    headers = {"Authorization": f"Bearer secret1234"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(
+                "http://localhost:8000/v1/chat", json=data, headers=headers
+            )
+            predictions = await response.json()
+    except Exception as e:
+        logger.error(f"Failed to obtain predictions from VLLM - Error: {e}")
+        return "Failed to obtain predictions from VLLM - See server logs for more details"
+    try:
+        output = predictions["choices"][0]["message"]["content"]
+        logger.debug(f"Generated text: {output}")
+        return output
+    except KeyError as e:
+        logger.error(f"Failed to parse predictions from VLLM - Error: {e}")
+        return "Failed to parse predictions from VLLM - See server logs for more details"
+
+
 def load_audio_model() -> tuple[BarkProcessor, BarkModel]:
     processor = AutoProcessor.from_pretrained("suno/bark-small", device=device)
     model = AutoModel.from_pretrained("suno/bark-small", device=device)
@@ -85,8 +114,10 @@ def load_image_model() -> StableDiffusionInpaintPipelineLegacy:
     # Use float32 on CPU, allow float16 on accelerators
     torch_dtype = torch.float16 if device.type in ("mps", "cuda") else torch.float32
     pipe = DiffusionPipeline.from_pretrained(
-        "segmind/tiny-sd", torch_dtype=torch_dtype, device=device,
-        )
+        "segmind/tiny-sd",
+        torch_dtype=torch_dtype,
+        device=device,
+    )
 
     return pipe
 
@@ -110,22 +141,25 @@ def load_video_model() -> StableVideoDiffusionPipeline:
 
 
 def generate_video(
-    pipe: StableVideoDiffusionPipeline, image: Image.Image, num_frames: int = 25,
-        ) -> list[Image.Image]:
-
+    pipe: StableVideoDiffusionPipeline,
+    image: Image.Image,
+    num_frames: int = 25,
+) -> list[Image.Image]:
     image = image.resize((1024, 576))
     generator = torch.manual_seed(42)
     frames = pipe(image, decode_chunk_size=8, generator=generator, num_frames=num_frames).frames[0]
     return frames
+
 
 def load_3d_model() -> ShapEPipeline:
     pipe = ShapEPipeline.from_pretrained("openai/shap-e", device=device)
     return pipe
 
 
-
 def generate_3d_geometry(
-    pipe: ShapEPipeline, prompt: str, num_inference_steps: int,
+    pipe: ShapEPipeline,
+    prompt: str,
+    num_inference_steps: int,
 ):
     images = pipe(
         prompt,

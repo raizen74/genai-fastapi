@@ -9,3 +9,11 @@ uv run bentoml serve building_genai_services.bentoml.bento:Generate
 curl localhost:8000/generate/text \
   -H "Content-Type: application/json" \
   -d '{"model":"tinyLlama","prompt":"Write a friendly 2-sentence introduction to a newsletter about AI.","temperature":0.2}
+
+uv run python -m vllm.entrypoints.openai.api_server \
+--model "TinyLlama/TinyLlama-1.1B-Chat-v1.0" \
+--dtype "auto" \
+--gpu-memory-utilization 0.85 \
+--swap-space 1 \
+--tensor-parallel-size 1 \
+--api-key "secret1234"

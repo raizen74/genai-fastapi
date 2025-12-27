@@ -18,6 +18,7 @@ from building_genai_services.models import (
     generate_audio,
     generate_image,
     generate_text,
+    generate_text_vllm,
     generate_video,
     load_3d_model,
     load_audio_model,
@@ -36,7 +37,7 @@ from building_genai_services.utils import (
 ########### Model loaded in memory for the entire app lifespan #################
 
 
-models = {}
+# models = {}
 
 # @asynccontextmanager
 # async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -48,15 +49,15 @@ models = {}
 
 
 #     models.clear()
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    models["text2text"] = load_text_model()
+# @asynccontextmanager
+# async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+#     models["text2text"] = load_text_model()
 
-    yield
+#     yield
 
-    ...  # Run cleanup code here
+#     ...  # Run cleanup code here
 
-    models.clear()
+#     models.clear()
 
 
 # app = FastAPI(lifespan=lifespan)
@@ -70,9 +71,35 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 #     output = generate_image(models["text2image"], prompt)
 #     return Response(content=img_to_bytes(output), media_type="image/png")
 
+# @app.post("/generate/text", response_model_exclude_defaults=True)
+# async def serve_text_to_text_controller(
+#     request: Request,
+#     body: TextModelRequest = Body(...),
+#     urls_content: str = Depends(get_urls_content),
+# ) -> TextModelResponse:
+#     logger.info(f"{body.model =}")
+#     logger.info(f"{urls_content =}")
+#     if body.model not in ["tinyLlama", "gemma2b"]:
+#         raise HTTPException(
+#             detail=f"Model {body.model} is not supported",
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#         )
+#     prompt = body.prompt + " " + urls_content
+#     output = generate_text(models["text2text"], prompt, body.temperature)
+#     res = TextModelResponse(
+#         model=body.model,
+#         temperature=body.temperature,
+#         content=output,
+#         ip=request.client.host,
+#     )
+
+#     logger.info(f"{res.model_dump =}")
+#     logger.info(f"{res.model_dump_json =}")
+#     return res
+
 ################################################################################
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 csv_header = [
     "Request ID",
@@ -114,14 +141,13 @@ async def monitor_service(
         )
     return response
 
-
-# @app.get("/generate/text")
-# def serve_text_to_text_controller(prompt: str) -> str:
-#     # pipe = load_text_model()
-#     # output = generate_text(pipe, prompt)
-#     output = generate_text(models["text2text"], prompt) # model loaded in lifespan
-#     return output
-
+@app.post("/generate/text")
+async def serve_vllm_text_to_text_controller(
+    request: Request, body: TextModelRequest,
+) -> TextModelResponse:
+    logger.info(f"{body.model =}")
+    output = await generate_text_vllm(body.prompt, body.temperature)
+    return TextModelResponse(content=output, ip=request.client.host)
 
 @app.post("/generate/text", response_model_exclude_defaults=True)
 async def serve_text_to_text_controller(
@@ -137,7 +163,8 @@ async def serve_text_to_text_controller(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
     prompt = body.prompt + " " + urls_content
-    output = generate_text(models["text2text"], body.prompt, body.temperature)
+    pipe = load_text_model()
+    output = generate_text(pipe, prompt, body.temperature)
     res = TextModelResponse(
         model=body.model,
         temperature=body.temperature,
