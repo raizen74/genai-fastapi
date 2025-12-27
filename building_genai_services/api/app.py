@@ -4,10 +4,11 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import Annotated
 from uuid import uuid4
 
 import httpx
-from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, Response, status
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, Response, status, UploadFile
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from PIL import Image
@@ -26,6 +27,7 @@ from building_genai_services.models import (
     load_text_model,
     load_video_model,
 )
+from building_genai_services.rag import save_file
 from building_genai_services.schemas import TextModelRequest, TextModelResponse, VoicePresets
 from building_genai_services.utils import (
     audio_array_to_buffer,
@@ -35,7 +37,6 @@ from building_genai_services.utils import (
 )
 
 ########### Model loaded in memory for the entire app lifespan #################
-
 
 # models = {}
 
@@ -141,13 +142,40 @@ async def monitor_service(
         )
     return response
 
-@app.post("/generate/text")
+
+@app.post("/upload")
+async def file_upload_controller(
+    file: Annotated[UploadFile, File(description="Uploaded PDF documents")],
+):
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            detail=f"Only uploading PDF documents are supported",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        await save_file(file)
+    except Exception as e:
+        raise HTTPException(
+            detail=f"An error occurred while saving file - Error: {e}",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    return {"filename": file.filename, "message": "File uploaded successfully"}
+
+
+@app.post("/generate/text/vllm")
 async def serve_vllm_text_to_text_controller(
-    request: Request, body: TextModelRequest,
+    request: Request,
+    body: TextModelRequest,
 ) -> TextModelResponse:
     logger.info(f"{body.model =}")
     output = await generate_text_vllm(body.prompt, body.temperature)
-    return TextModelResponse(content=output, ip=request.client.host)
+    return TextModelResponse(
+        model=body.model,
+        temperature=body.temperature,
+        content=output,
+        ip=request.client.host,
+    )
+
 
 @app.post("/generate/text", response_model_exclude_defaults=True)
 async def serve_text_to_text_controller(

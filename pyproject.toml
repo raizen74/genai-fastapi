@@ -3,9 +3,10 @@ name = "building-genai-services"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.13"
 dependencies = [
     "accelerate>=1.10.1",
+    "aiofiles>=25.1.0",
     "av>=15.1.0",
     "bentoml>=1.4.31",
     "bs4>=0.0.2",
