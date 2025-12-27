@@ -14,10 +14,12 @@ A comprehensive FastAPI-based platform for serving multiple generative AI models
 
 ### Additional Features
 
+- **RAG (Retrieval-Augmented Generation)**: Document-based knowledge retrieval system with PDF upload and semantic search
 - **BentoML Integration**: Scalable model serving with BentoML
 - **Streamlit Clients**: Ready-to-use web interfaces for testing AI endpoints
 - **Usage Monitoring**: Built-in middleware for tracking API usage, response times, and request metadata
 - **Hardware Acceleration**: Automatic device detection (CUDA, Apple Silicon MPS, or CPU)
+- **URL Content Extraction**: Automatic extraction and processing of URLs mentioned in prompts
 
 ## Architecture
 
@@ -29,6 +31,12 @@ building_genai_services/
 ├── models/        # Model loading and inference logic
 ├── schemas/       # Pydantic schemas and type definitions
 ├── utils/         # Helper functions for media processing
+├── rag/           # RAG system components
+│   ├── repository.py  # Qdrant vector database operations
+│   ├── services.py    # Vector storage service
+│   ├── transform.py   # Text embedding and processing
+│   └── extractor.py   # PDF text extraction
+├── dependencies/  # FastAPI dependency injection
 └── bentoml/       # BentoML service definitions
 
 streamlit/         # Streamlit client applications
@@ -39,11 +47,36 @@ streamlit/         # Streamlit client applications
 
 ## API Endpoints
 
+### Document Upload (RAG)
+```
+POST /upload
+Form data: file (PDF)
+```
+Uploads a PDF document for knowledge base integration. The endpoint:
+- Accepts only PDF files
+- Extracts text content using PyPDF
+- Generates embeddings using Jina AI embeddings (768-dimensional vectors)
+- Stores chunks in Qdrant vector database with semantic search capabilities
+- Processes documents asynchronously in the background
+
+**Response:**
+```json
+{
+  "filename": "document.pdf",
+  "message": "File uploaded successfully"
+}
+```
+
 ### Text Generation
 ```
-GET /generate/text?prompt=<your_prompt>
+POST /generate/text
+Body: {"prompt": "your question"}
 ```
-Returns generated text from TinyLlama chatbot.
+Returns generated text from TinyLlama chatbot with RAG-enhanced context. The endpoint automatically:
+- Extracts and fetches content from any URLs mentioned in the prompt
+- Performs semantic search against the vector database (top 3 results with 0.7 similarity threshold)
+- Augments the prompt with retrieved document chunks and URL content
+- Generates contextually-aware responses
 
 ### Image Generation
 ```
@@ -74,9 +107,10 @@ Proxies image generation through BentoML service (requires BentoML server runnin
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.13+
 - CUDA-capable GPU (optional, for faster inference)
 - Apple Silicon Mac (optional, for MPS acceleration)
+- Qdrant vector database (for RAG functionality)
 
 ### Setup
 
@@ -95,6 +129,17 @@ Or using pip:
 ```bash
 pip install -e .
 ```
+
+3. Start Qdrant vector database (required for RAG):
+
+Using Docker:
+```bash
+docker run -p 6333:6333 -p 6334:6334 \
+    -v $(pwd)/qdrant_storage:/qdrant/storage:z \
+    qdrant/qdrant
+```
+
+Or install locally following [Qdrant installation guide](https://qdrant.tech/documentation/guides/installation/).
 
 ## Usage
 
@@ -134,6 +179,27 @@ streamlit run streamlit/client_image.py
 bentoml serve building_genai_services.bentoml.bento:Generate
 ```
 
+### Using RAG with Document Upload
+
+1. Upload a PDF document to build your knowledge base:
+```bash
+curl -X POST "http://localhost:8000/upload" \
+  -F "file=@your_document.pdf"
+```
+
+2. Query the knowledge base through text generation:
+```bash
+curl -X POST "http://localhost:8000/generate/text" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Who is ali parandeh?"}'
+```
+
+The system will automatically:
+- Search the vector database for relevant document chunks
+- Retrieve the top 3 most similar passages (with similarity score > 0.7)
+- Include the retrieved context in the LLM prompt
+- Generate an informed response based on your uploaded documents
+
 ## Monitoring and Usage Tracking
 
 All API requests are automatically logged to `usage.csv` with the following information:
@@ -153,6 +219,7 @@ Each response includes custom headers:
 ## Models Used
 
 - **TinyLlama-1.1B-Chat-v1.0**: Lightweight language model for text generation
+- **Jina AI Embeddings v2**: 768-dimensional text embeddings for semantic search
 - **Tiny-SD (Segmind)**: Efficient Stable Diffusion model for image generation
 - **Bark (Suno)**: Text-to-audio synthesis model
 - **Stable Video Diffusion**: Image-to-video generation
@@ -164,9 +231,13 @@ Key dependencies include:
 - FastAPI & Uvicorn for API serving
 - Transformers & Diffusers for model inference
 - PyTorch for deep learning operations
+- Qdrant Client for vector database operations
+- PyPDF for PDF text extraction
+- Jina AI for text embeddings
 - Streamlit for client interfaces
 - BentoML for production-ready model serving
 - Pillow for image processing
+- aiofiles for async file operations
 
 See [pyproject.toml](pyproject.toml) for complete dependency list.
 

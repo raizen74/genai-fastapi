@@ -17,3 +17,9 @@ uv run python -m vllm.entrypoints.openai.api_server \
 --swap-space 1 \
 --tensor-parallel-size 1 \
 --api-key "secret1234"
+
+docker run -p 6333:6333 -p 6334:6334 \
+-v $(pwd)/qdrant_storage:/qdrant/storage:z \
+qdrant/qdrant
+
+uv run streamlit run ./streamlit/client_upload.py

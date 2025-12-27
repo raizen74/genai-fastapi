@@ -8,12 +8,23 @@ from typing import Annotated
 from uuid import uuid4
 
 import httpx
-from fastapi import Body, Depends, FastAPI, File, HTTPException, Request, Response, status, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    Body,
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from PIL import Image
 
-from building_genai_services.dependencies import get_urls_content
+from building_genai_services.dependencies import get_rag_content, get_urls_content
 from building_genai_services.models import (
     generate_3d_geometry,
     generate_audio,
@@ -27,7 +38,7 @@ from building_genai_services.models import (
     load_text_model,
     load_video_model,
 )
-from building_genai_services.rag import save_file
+from building_genai_services.rag import pdf_text_extractor, save_file, vector_service
 from building_genai_services.schemas import TextModelRequest, TextModelResponse, VoicePresets
 from building_genai_services.utils import (
     audio_array_to_buffer,
@@ -146,6 +157,7 @@ async def monitor_service(
 @app.post("/upload")
 async def file_upload_controller(
     file: Annotated[UploadFile, File(description="Uploaded PDF documents")],
+    bg_text_processor: BackgroundTasks,
 ):
     if file.content_type != "application/pdf":
         raise HTTPException(
@@ -153,13 +165,51 @@ async def file_upload_controller(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
     try:
-        await save_file(file)
+        filepath = await save_file(file)
+        bg_text_processor.add_task(pdf_text_extractor, filepath)
+        bg_text_processor.add_task(
+            vector_service.store_file_content_in_db,
+            filepath.replace("pdf", "txt"),
+            512,
+            "knowledgebase",
+            768,
+        )
+
     except Exception as e:
         raise HTTPException(
             detail=f"An error occurred while saving file - Error: {e}",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
     return {"filename": file.filename, "message": "File uploaded successfully"}
+
+
+@app.post("/generate/text", response_model_exclude_defaults=True)
+async def serve_text_to_text_controller(
+    request: Request,
+    body: TextModelRequest = Body(...),
+    urls_content: str = Depends(get_urls_content),
+    rag_content: str = Depends(get_rag_content),
+) -> TextModelResponse:
+    logger.info(f"{body.model =}")
+    logger.info(f"{urls_content =}")
+    if body.model not in ["tinyLlama", "gemma2b"]:
+        raise HTTPException(
+            detail=f"Model {body.model} is not supported",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    prompt = body.prompt + " " + urls_content + rag_content
+    pipe = load_text_model()
+    output = generate_text(pipe, prompt, body.temperature)
+    res = TextModelResponse(
+        model=body.model,
+        temperature=body.temperature,
+        content=output,
+        ip=request.client.host,
+    )
+
+    logger.info(f"{res.model_dump =}")
+    logger.info(f"{res.model_dump_json =}")
+    return res
 
 
 @app.post("/generate/text/vllm")
@@ -175,34 +225,6 @@ async def serve_vllm_text_to_text_controller(
         content=output,
         ip=request.client.host,
     )
-
-
-@app.post("/generate/text", response_model_exclude_defaults=True)
-async def serve_text_to_text_controller(
-    request: Request,
-    body: TextModelRequest = Body(...),
-    urls_content: str = Depends(get_urls_content),
-) -> TextModelResponse:
-    logger.info(f"{body.model =}")
-    logger.info(f"{urls_content =}")
-    if body.model not in ["tinyLlama", "gemma2b"]:
-        raise HTTPException(
-            detail=f"Model {body.model} is not supported",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
-    prompt = body.prompt + " " + urls_content
-    pipe = load_text_model()
-    output = generate_text(pipe, prompt, body.temperature)
-    res = TextModelResponse(
-        model=body.model,
-        temperature=body.temperature,
-        content=output,
-        ip=request.client.host,
-    )
-
-    logger.info(f"{res.model_dump =}")
-    logger.info(f"{res.model_dump_json =}")
-    return res
 
 
 @app.get(
