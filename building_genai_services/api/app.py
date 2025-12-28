@@ -1,12 +1,12 @@
 import csv
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from io import BytesIO
 from typing import Annotated
 from uuid import uuid4
-
+from building_genai_services.database import Conversation
 import httpx
 from fastapi import (
     BackgroundTasks,
@@ -23,7 +23,9 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from PIL import Image
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from building_genai_services.database import engine, init_db, DBSessionDep
 from building_genai_services.dependencies import get_rag_content, get_urls_content
 from building_genai_services.models import (
     generate_3d_geometry,
@@ -39,6 +41,7 @@ from building_genai_services.models import (
     load_video_model,
 )
 from building_genai_services.rag import pdf_text_extractor, save_file, vector_service
+from building_genai_services.routers import router as conversations_router, GetConversationDep, store_message
 from building_genai_services.schemas import TextModelRequest, TextModelResponse, VoicePresets
 from building_genai_services.utils import (
     audio_array_to_buffer,
@@ -69,10 +72,23 @@ from building_genai_services.utils import (
 
 #     ...  # Run cleanup code here
 
+
 #     models.clear()
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # await init_db()
+    # Database schema is managed by Alembic migrations
+    # Run: alembic upgrade head
+    # other startup operations within the lifespan
+    ...
+    yield
+    await engine.dispose()
 
 
-# app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan)
+# app = FastAPI()
+
+app.include_router(conversations_router)
 
 # @app.get(
 #     "/generate/image",
@@ -110,8 +126,31 @@ from building_genai_services.utils import (
 #     return res
 
 ################################################################################
+@app.post("/store/message/{conversation_id}")
+async def stream_llm_controller(
+    request: Request,
+    prompt: str,
+    background_task: BackgroundTasks,
+    session: DBSessionDep,
+    conversation: GetConversationDep,
+):
+    print(f"{conversation.id = }")
+    pipe = load_text_model()
+    output = generate_text(pipe, prompt, 0.01)
+    background_task.add_task(
+        store_message, prompt, output, conversation.id, session,
+    )
+    res = TextModelResponse(
+        model="tinyLlama",
+        temperature=0.01,
+        content=output,
+        ip=request.client.host,
+    )
 
-app = FastAPI()
+    logger.info(f"{res.model_dump =}")
+    logger.info(f"{res.model_dump_json =}")
+    return res
+
 
 csv_header = [
     "Request ID",

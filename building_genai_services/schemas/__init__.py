@@ -1,6 +1,11 @@
 from .schemas import (
+    ConversationCreate,
+    ConversationOut,
+    ConversationUpdate,
     ImageModelRequest,
     ImageModelResponse,
+    MessageCreate,
+    MessageOut,
     ModelRequest,
     ModelResponse,
     TextModelRequest,
@@ -10,11 +15,16 @@ from .schemas import (
 
 # Type aliases need to be explicitly exported through an __init__.py file
 __all__ = [
-    "VoicePresets",
+    "ConversationCreate",
+    "ConversationOut",
+    "ConversationUpdate",
+    "ImageModelRequest",
+    "ImageModelResponse",
+    "MessageCreate",
+    "MessageOut",
     "ModelRequest",
     "ModelResponse",
     "TextModelRequest",
     "TextModelResponse",
-    "ImageModelRequest",
-    "ImageModelResponse",
+    "VoicePresets",
 ]

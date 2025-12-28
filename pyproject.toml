@@ -1,22 +1,30 @@
 [project]
 name = "building-genai-services"
 version = "0.1.0"
-description = "Add your description here"
+authors = [
+    { name = "David Galera", email = "raizen74@gmail.com" }
+]
+description = "Building generative ai services with BentoML, FastAPI, and more."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "accelerate>=1.10.1",
     "aiofiles>=25.1.0",
+    "alembic>=1.17.2",
     "av>=15.1.0",
     "bentoml>=1.4.31",
     "bs4>=0.0.2",
     "diffusers>=0.36.0",
     "fastapi>=0.127.0",
+    "greenlet>=3.3.0",
     "loguru>=0.7.3",
+    "psycopg>=3.3.2",
+    "psycopg-binary>=3.3.2",
     "pypdf>=6.5.0",
     "python-multipart>=0.0.20",
     "qdrant-client>=1.16.2",
     "soundfile>=0.13.1",
+    "sqlalchemy>=2.0.45",
     "streamlit>=1.50.0",
     "tiktoken>=0.12.0",
     "torch>=2.8.0",

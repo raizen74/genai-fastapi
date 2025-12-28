@@ -23,3 +23,34 @@ docker run -p 6333:6333 -p 6334:6334 \
 qdrant/qdrant
 
 uv run streamlit run ./streamlit/client_upload.py
+
+docker run -p 5432:5432  \
+	-e POSTGRES_USER=fastapi \
+	-e POSTGRES_PASSWORD=mysecretpassword \
+	-e POSTGRES_DB=backend_db \
+	-e PGDATA=/var/lib/postgresql/data \
+  -v "$(pwd)"/dbstorage:/var/lib/postgresql/data \
+  postgres:latest
+
+Test the create/conversations and store/messages endpoints:
+
+First create a conversation:
+
+curl -X POST http://localhost:8000/conversations \       
+  -H "Content-Type: application/json" \                                                       
+  -d '{
+    "title": "Test Conversation",
+    "model_type": "gemma2b"
+  }'
+
+Store a message in the conversation:
+
+curl -X POST -G "http://localhost:8000/store/message/1" \
+  --data-urlencode "prompt=Write a friendly 2-sentence introduction to a newsletter about AI."
+
+uv run alembic init alembic
+alembic revision --autogenerate -m "Initial migration"
+alembic upgrade head
+alembic revision --autogenerate -m "Initial migration"\n
+alembic history
+alembic current
