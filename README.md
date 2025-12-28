@@ -15,6 +15,10 @@ A comprehensive FastAPI-based platform for serving multiple generative AI models
 ### Additional Features
 
 - **RAG (Retrieval-Augmented Generation)**: Document-based knowledge retrieval system with PDF upload and semantic search
+- **PostgreSQL Database**: Full persistence layer with async SQLAlchemy for conversations and messages
+- **Database Migrations**: Alembic integration for schema versioning and migration management
+- **RESTful API**: Complete CRUD operations for conversation management
+- **Repository Pattern**: Clean architecture with separate repository and service layers
 - **BentoML Integration**: Scalable model serving with BentoML
 - **Streamlit Clients**: Ready-to-use web interfaces for testing AI endpoints
 - **Usage Monitoring**: Built-in middleware for tracking API usage, response times, and request metadata
@@ -28,6 +32,16 @@ The project follows a modular architecture:
 ```
 building_genai_services/
 ├── api/           # FastAPI application and endpoints
+├── routers/       # API route handlers
+│   └── conversations.py  # Conversation management endpoints
+├── database/      # Database layer
+│   ├── entities.py       # SQLAlchemy ORM models
+│   ├── database.py       # Database connection and session management
+│   ├── repositories/     # Data access layer
+│   │   ├── conversations.py  # Conversation and Message repositories
+│   │   └── interfaces.py     # Repository interface definitions
+│   └── services/         # Business logic layer
+│       └── conversations.py  # Conversation service
 ├── models/        # Model loading and inference logic
 ├── schemas/       # Pydantic schemas and type definitions
 ├── utils/         # Helper functions for media processing
@@ -39,6 +53,10 @@ building_genai_services/
 ├── dependencies/  # FastAPI dependency injection
 └── bentoml/       # BentoML service definitions
 
+alembic/           # Database migrations
+├── versions/      # Migration scripts
+└── env.py         # Alembic environment configuration
+
 streamlit/         # Streamlit client applications
 ├── client_text.py   # Text chatbot interface
 ├── client_audio.py  # Audio generation interface
@@ -46,6 +64,97 @@ streamlit/         # Streamlit client applications
 ```
 
 ## API Endpoints
+
+### Conversation Management
+
+#### List Conversations
+```
+GET /conversations?skip=0&take=100
+```
+Retrieves a paginated list of all conversations.
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "title": "Discussion about AI",
+    "model_type": "tinyLlama",
+    "created_at": "2025-12-28T10:00:00Z",
+    "updated_at": "2025-12-28T10:30:00Z",
+    "messages": []
+  }
+]
+```
+
+#### Get Conversation
+```
+GET /conversations/{conversation_id}
+```
+Retrieves a specific conversation by ID.
+
+#### Create Conversation
+```
+POST /conversations
+Body: {"title": "New Chat", "model_type": "tinyLlama"}
+```
+Creates a new conversation.
+
+**Response:**
+```json
+{
+  "id": 1,
+  "title": "New Chat",
+  "model_type": "tinyLlama",
+  "created_at": "2025-12-28T10:00:00Z",
+  "updated_at": "2025-12-28T10:00:00Z",
+  "messages": []
+}
+```
+
+#### Update Conversation
+```
+PUT /conversations/{conversation_id}
+Body: {"title": "Updated Title"}
+```
+Updates an existing conversation.
+
+#### Delete Conversation
+```
+DELETE /conversations/{conversation_id}
+```
+Deletes a conversation and all associated messages (cascade delete).
+
+#### List Conversation Messages
+```
+GET /conversations/{conversation_id}/messages
+```
+Retrieves all messages for a specific conversation.
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "conversation_id": 1,
+    "prompt_content": "What is AI?",
+    "response_content": "AI is...",
+    "prompt_tokens": 5,
+    "response_tokens": 50,
+    "total_tokens": 55,
+    "is_success": true,
+    "status_code": 200,
+    "created_at": "2025-12-28T10:00:00Z",
+    "updated_at": "2025-12-28T10:00:00Z"
+  }
+]
+```
+
+#### Store Message with Generation
+```
+POST /store/message/{conversation_id}?prompt=<your_question>
+```
+Generates text using TinyLlama and stores both the prompt and response in the conversation. The message is stored asynchronously in the background.
 
 ### Document Upload (RAG)
 ```
@@ -108,9 +217,10 @@ Proxies image generation through BentoML service (requires BentoML server runnin
 ### Prerequisites
 
 - Python 3.13+
+- PostgreSQL database
+- Qdrant vector database (for RAG functionality)
 - CUDA-capable GPU (optional, for faster inference)
 - Apple Silicon Mac (optional, for MPS acceleration)
-- Qdrant vector database (for RAG functionality)
 
 ### Setup
 
@@ -130,7 +240,29 @@ Or using pip:
 pip install -e .
 ```
 
-3. Start Qdrant vector database (required for RAG):
+3. Start PostgreSQL database:
+
+Using Docker:
+```bash
+docker run -d \
+    --name postgres \
+    -e POSTGRES_USER=fastapi \
+    -e POSTGRES_PASSWORD=mysecretpassword \
+    -e POSTGRES_DB=backend_db \
+    -p 5432:5432 \
+    postgres:latest
+```
+
+4. Run database migrations:
+```bash
+# Create initial migration
+alembic revision --autogenerate -m "Initial migration"
+
+# Apply migrations to database
+alembic upgrade head
+```
+
+5. Start Qdrant vector database (required for RAG):
 
 Using Docker:
 ```bash
@@ -229,6 +361,9 @@ Each response includes custom headers:
 
 Key dependencies include:
 - FastAPI & Uvicorn for API serving
+- SQLAlchemy 2.0+ for async ORM
+- Alembic for database migrations
+- psycopg (PostgreSQL driver) for database connectivity
 - Transformers & Diffusers for model inference
 - PyTorch for deep learning operations
 - Qdrant Client for vector database operations
@@ -241,13 +376,95 @@ Key dependencies include:
 
 See [pyproject.toml](pyproject.toml) for complete dependency list.
 
+## Database Management
+
+### Database Schema
+
+The application uses two main tables:
+
+**Conversations Table:**
+- `id`: Primary key
+- `title`: Conversation title
+- `model_type`: AI model used (e.g., "tinyLlama")
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
+
+**Messages Table:**
+- `id`: Primary key
+- `conversation_id`: Foreign key to conversations (CASCADE delete)
+- `prompt_content`: User's prompt
+- `response_content`: AI response
+- `prompt_tokens`: Token count for prompt (optional)
+- `response_tokens`: Token count for response (optional)
+- `total_tokens`: Total tokens used (optional)
+- `is_success`: Success indicator (optional)
+- `status_code`: HTTP status code (optional)
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
+
+### Alembic Migrations
+
+Alembic is configured to manage database schema changes:
+
+**Configuration:**
+- Database URL: `postgresql+psycopg://fastapi:mysecretpassword@localhost:5432/backend_db`
+- Migrations directory: `alembic/versions/`
+- Auto-generation enabled with SQLAlchemy metadata
+
+**Common Migration Commands:**
+
+```bash
+# Create a new migration after changing models
+alembic revision --autogenerate -m "Add new column"
+
+# Apply all pending migrations
+alembic upgrade head
+
+# Rollback one migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+
+# Check current database version
+alembic current
+
+# Rollback to specific version
+alembic downgrade <revision_id>
+```
+
+**Important Notes:**
+- Always review auto-generated migrations before applying them
+- Database schema is version-controlled through Alembic
+- The app no longer uses `Base.metadata.create_all()` - all schema changes are managed through migrations
+- Migrations run synchronously while the app uses async SQLAlchemy for queries
+
+### Repository Pattern
+
+The codebase implements the Repository pattern for clean separation of concerns:
+
+- **Entities** ([database/entities.py](building_genai_services/database/entities.py)): SQLAlchemy ORM models
+- **Repositories** ([database/repositories/](building_genai_services/database/repositories/)): Data access layer with CRUD operations
+- **Services** ([database/services/](building_genai_services/database/services/)): Business logic layer
+- **Routers** ([routers/conversations.py](building_genai_services/routers/conversations.py)): API endpoint handlers
+
+This architecture provides:
+- Clear separation between data access and business logic
+- Easy testing through dependency injection
+- Reusable repository methods across different services
+- Type-safe database operations with async SQLAlchemy
+
 ## Development
 
 The project uses:
-- Python 3.9+ type hints throughout
+- Python 3.13+ type hints throughout
 - Async/await patterns for non-blocking I/O
+- SQLAlchemy 2.0+ async ORM with PostgreSQL
+- Alembic for database schema versioning
+- Repository pattern for clean architecture
 - Context managers for model lifecycle management
 - Middleware for cross-cutting concerns (monitoring, logging)
+- Dependency injection for database sessions
 
 ## License
 
