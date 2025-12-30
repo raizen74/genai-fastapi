@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from io import BytesIO
 from typing import Annotated
 from uuid import uuid4
-from building_genai_services.database import Conversation
+
 import httpx
 from fastapi import (
     BackgroundTasks,
@@ -25,8 +25,7 @@ from loguru import logger
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from building_genai_services.database import engine, init_db, DBSessionDep
-from building_genai_services.dependencies import get_rag_content, get_urls_content
+from building_genai_services.database import Conversation, DBSessionDep, engine, init_db
 from building_genai_services.models import (
     generate_3d_geometry,
     generate_audio,
@@ -40,8 +39,18 @@ from building_genai_services.models import (
     load_text_model,
     load_video_model,
 )
-from building_genai_services.rag import pdf_text_extractor, save_file, vector_service
-from building_genai_services.routers import router as conversations_router, GetConversationDep, store_message
+from building_genai_services.rag import (
+    get_rag_content,
+    get_urls_content,
+    pdf_text_extractor,
+    save_file,
+    vector_service,
+)
+from building_genai_services.routers import (
+    GetConversationDep,
+    store_message,
+    router as conversations_router,
+)
 from building_genai_services.schemas import TextModelRequest, TextModelResponse, VoicePresets
 from building_genai_services.utils import (
     audio_array_to_buffer,
@@ -125,6 +134,7 @@ app.include_router(conversations_router)
 #     logger.info(f"{res.model_dump_json =}")
 #     return res
 
+
 ################################################################################
 @app.post("/store/message/{conversation_id}")
 async def stream_llm_controller(
@@ -138,7 +148,11 @@ async def stream_llm_controller(
     pipe = load_text_model()
     output = generate_text(pipe, prompt, 0.01)
     background_task.add_task(
-        store_message, prompt, output, conversation.id, session,
+        store_message,
+        prompt,
+        output,
+        conversation.id,
+        session,
     )
     res = TextModelResponse(
         model="tinyLlama",

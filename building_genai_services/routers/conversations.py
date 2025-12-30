@@ -33,7 +33,7 @@ async def get_conversation(
         )
     return conversation
 
-
+# conversation_id and session will be injected automatically into get_conversation and the result will be provided to the endpoint function
 GetConversationDep = Annotated[Conversation, Depends(get_conversation)]
 
 async def store_message(

@@ -36,8 +36,8 @@ Test the create/conversations and store/messages endpoints:
 
 First create a conversation:
 
-curl -X POST http://localhost:8000/conversations \       
-  -H "Content-Type: application/json" \                                                       
+curl -X POST http://localhost:8000/conversations \
+  -H "Content-Type: application/json" \
   -d '{
     "title": "Test Conversation",
     "model_type": "gemma2b"
