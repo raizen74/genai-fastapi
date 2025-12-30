@@ -48,9 +48,9 @@ Store a message in the conversation:
 curl -X POST -G "http://localhost:8000/store/message/1" \
   --data-urlencode "prompt=Write a friendly 2-sentence introduction to a newsletter about AI."
 
-uv run alembic init alembic
-alembic revision --autogenerate -m "Initial migration"
-alembic upgrade head
-alembic revision --autogenerate -m "Initial migration"\n
-alembic history
-alembic current
+alembic init alembic
+alembic revision --autogenerate -m "Initial migration" - Create a new migration based on model changes
+alembic upgrade head - Apply all pending migrations
+alembic downgrade -1 - Rollback the last migration
+alembic current - Show current migration version
+alembic history - Show migration history

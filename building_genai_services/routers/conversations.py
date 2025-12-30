@@ -18,7 +18,7 @@ from building_genai_services.schemas import (
     MessageOut,
 )
 
-router = APIRouter(prefix="/conversations")
+router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
 
 async def get_conversation(

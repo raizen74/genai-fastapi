@@ -4,6 +4,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from building_genai_services.database import Base
+# Import all models so Alembic can detect them
+from building_genai_services.auth import entities as auth_entities  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

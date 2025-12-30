@@ -2,9 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from building_genai_services.database import Conversation, Message
+from building_genai_services.interfaces import Repository
 from building_genai_services.schemas import ConversationCreate, ConversationUpdate, MessageCreate
-
-from .interfaces import Repository
 
 
 class ConversationRepository(Repository):

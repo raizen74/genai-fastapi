@@ -24,7 +24,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from building_genai_services.auth import router as auth_router
 from building_genai_services.database import Conversation, DBSessionDep, engine, init_db
 from building_genai_services.models import (
     generate_3d_geometry,
@@ -98,6 +98,7 @@ app = FastAPI(lifespan=lifespan)
 # app = FastAPI()
 
 app.include_router(conversations_router)
+app.include_router(auth_router)
 
 # @app.get(
 #     "/generate/image",
