@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from building_genai_services.database import ConversationRepository, Message
+from .repository import ConversationRepository, Message
 
 
 class ConversationService(ConversationRepository):

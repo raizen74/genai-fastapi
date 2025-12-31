@@ -1,9 +1,10 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from building_genai_services.database import Conversation, Message
-from building_genai_services.interfaces import Repository
-from building_genai_services.schemas import ConversationCreate, ConversationUpdate, MessageCreate
+from building_genai_services.common.entities import Conversation, Message
+from building_genai_services.common.interfaces import Repository
+
+from .schemas import ConversationCreate, ConversationUpdate, MessageCreate
 
 
 class ConversationRepository(Repository):
@@ -33,7 +34,9 @@ class ConversationRepository(Repository):
         return new_conversation
 
     async def update(
-        self, conversation_id: int, updated_conversation: ConversationUpdate,
+        self,
+        conversation_id: int,
+        updated_conversation: ConversationUpdate,
     ) -> Conversation | None:
         async with self.session.begin():
             result = await self.session.execute(
@@ -58,10 +61,10 @@ class ConversationRepository(Repository):
                 return
             await self.session.delete(conversation)
 
+
 class MessageRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-
 
     async def create(self, message: MessageCreate) -> Message:
         new_message = Message(**message.model_dump())

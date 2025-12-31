@@ -3,20 +3,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from building_genai_services.database import (
-    Conversation,
-    ConversationRepository,
-    ConversationService,
-    DBSessionDep,
-    MessageRepository,
-)
-from building_genai_services.schemas import (
+from building_genai_services.common.entities import Conversation
+from building_genai_services.common.session import DBSessionDep
+
+from .repository import ConversationRepository, MessageRepository
+from .schemas import (
     ConversationCreate,
     ConversationOut,
     ConversationUpdate,
     MessageCreate,
     MessageOut,
 )
+from .services import ConversationService
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
 
@@ -33,8 +31,10 @@ async def get_conversation(
         )
     return conversation
 
+
 # conversation_id and session will be injected automatically into get_conversation and the result will be provided to the endpoint function
 GetConversationDep = Annotated[Conversation, Depends(get_conversation)]
+
 
 async def store_message(
     prompt_content: str,
@@ -100,6 +100,7 @@ async def delete_conversation_controller(
     session: DBSessionDep,
 ) -> None:
     await ConversationRepository(session).delete(conversation.id)
+
 
 @router.get("/{conversation_id}/messages")
 async def list_conversation_messages_controller(

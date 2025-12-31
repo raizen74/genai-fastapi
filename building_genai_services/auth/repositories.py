@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from building_genai_services.interfaces import Repository
+from building_genai_services.common.entities import Token
+from building_genai_services.common.interfaces import Repository
 
-from .entities import Token
 from .schemas import TokenCreate, TokenUpdate
 
 
@@ -34,7 +34,9 @@ class TokenRepository(Repository):
         return new_token
 
     async def update(
-        self, token_id, updated_token: TokenUpdate,
+        self,
+        token_id,
+        updated_token: TokenUpdate,
     ) -> Token | None:
         async with self.session.begin():
             result = await self.session.execute(

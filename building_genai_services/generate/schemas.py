@@ -5,7 +5,6 @@ from uuid import uuid4
 from pydantic import (
     AfterValidator,
     BaseModel,
-    ConfigDict,
     Field,
     HttpUrl,
     IPvAnyAddress,
@@ -14,7 +13,7 @@ from pydantic import (
     validate_call,
 )
 
-from building_genai_services.utils import count_tokens
+from .utils import count_tokens
 
 VoicePresets = Literal["v2/en_speaker_1", "v2/en_speaker_9"]
 
@@ -81,12 +80,12 @@ class ModelResponse(BaseModel):
 class TextModelRequest(BaseModel):
     model: Literal["tinyLlama", "gemma2b"]
     prompt: str
-    temperature: float = 0.0
+    temperature: float = 0.1
 
 
 class TextModelResponse(ModelResponse):
     model: SupportedTextModels
-    temperature: Annotated[float, Field(ge=0.0, le=1.0, default=0.0)]
+    temperature: Annotated[float, Field(ge=0.0, le=1.0, default=0.1)]
     # price: Annotated[float, Field(ge=0, default=0.0)]
 
     @computed_field
@@ -108,39 +107,3 @@ class ImageModelRequest(ModelRequest):
 class ImageModelResponse(ModelResponse):
     size: ImageSize
     url: Annotated[str, HttpUrl] | None = None
-
-
-class ConversationBase(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    title: str
-    model_type: str
-
-
-class ConversationCreate(ConversationBase):
-    pass
-
-
-class ConversationUpdate(ConversationBase):
-    pass
-
-
-class ConversationOut(ConversationBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-class MessageCreate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    conversation_id: int
-    prompt_content: str
-    response_content: str
-
-
-class MessageOut(MessageCreate):
-
-    id: int
-    created_at: datetime
-    updated_at: datetime
-

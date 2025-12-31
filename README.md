@@ -14,10 +14,12 @@ A comprehensive FastAPI-based platform for serving multiple generative AI models
 
 ### Additional Features
 
+- **Authentication & Authorization**: JWT-based user authentication with password hashing and token management
 - **RAG (Retrieval-Augmented Generation)**: Document-based knowledge retrieval system with PDF upload and semantic search
-- **PostgreSQL Database**: Full persistence layer with async SQLAlchemy for conversations and messages
+- **PostgreSQL Database**: Full persistence layer with async SQLAlchemy for users, conversations, and messages
 - **Database Migrations**: Alembic integration for schema versioning and migration management
 - **RESTful API**: Complete CRUD operations for conversation management
+- **Modular Architecture**: Clean separation of concerns with domain-driven module organization
 - **Repository Pattern**: Clean architecture with separate repository and service layers
 - **BentoML Integration**: Scalable model serving with BentoML
 - **Streamlit Clients**: Ready-to-use web interfaces for testing AI endpoints
@@ -27,43 +29,97 @@ A comprehensive FastAPI-based platform for serving multiple generative AI models
 
 ## Architecture
 
-The project follows a modular architecture:
+The project follows a modular architecture with clear separation of concerns:
 
 ```
 building_genai_services/
-├── api/           # FastAPI application and endpoints
-├── routers/       # API route handlers
-│   └── conversations.py  # Conversation management endpoints
-├── database/      # Database layer
-│   ├── entities.py       # SQLAlchemy ORM models
-│   ├── database.py       # Database connection and session management
-│   ├── repositories/     # Data access layer
-│   │   ├── conversations.py  # Conversation and Message repositories
-│   │   └── interfaces.py     # Repository interface definitions
-│   └── services/         # Business logic layer
-│       └── conversations.py  # Conversation service
-├── models/        # Model loading and inference logic
-├── schemas/       # Pydantic schemas and type definitions
-├── utils/         # Helper functions for media processing
-├── rag/           # RAG system components
-│   ├── repository.py  # Qdrant vector database operations
-│   ├── services.py    # Vector storage service
-│   ├── transform.py   # Text embedding and processing
-│   └── extractor.py   # PDF text extraction
-├── dependencies/  # FastAPI dependency injection
-└── bentoml/       # BentoML service definitions
+├── api/                # FastAPI application and main app setup
+│   └── app.py              # FastAPI app instance and middleware
+├── auth/               # Authentication & Authorization module
+│   ├── router.py           # Auth endpoints (register, login, token)
+│   ├── services.py         # Auth business logic (JWT, password hashing)
+│   ├── repositories.py     # User data access layer
+│   ├── schemas.py          # Auth request/response models
+│   └── exceptions.py       # Auth-specific exceptions
+├── common/             # Shared components across modules
+│   ├── entities/           # SQLAlchemy ORM models
+│   │   └── entities.py         # Conversation, Message, User entities
+│   ├── interfaces/         # Repository interface definitions
+│   │   └── interfaces.py       # Base repository interfaces
+│   └── session/            # Database session management
+│       └── session.py          # Async database session factory
+├── conversations/      # Conversation management module
+│   ├── router.py           # Conversation CRUD endpoints
+│   ├── services.py         # Conversation business logic
+│   ├── repository.py       # Conversation & Message data access
+│   └── schemas.py          # Conversation request/response models
+├── generate/           # AI generation endpoints module
+│   ├── router.py           # Text, image, audio, video generation
+│   ├── models.py           # Model loading and inference logic
+│   ├── schemas.py          # Generation request/response models
+│   └── utils.py            # Media processing utilities
+├── rag/                # RAG (Retrieval-Augmented Generation) module
+│   ├── upload.py           # PDF upload endpoint
+│   ├── services.py         # Vector storage service
+│   ├── repository.py       # Qdrant vector database operations
+│   ├── transform.py        # Text embedding and processing
+│   ├── extractor.py        # PDF text extraction
+│   ├── scraper.py          # URL content extraction
+│   └── dependencies.py     # RAG dependency injection
+└── bentoml/            # BentoML service definitions
+    └── bento.py            # Model serving with BentoML
 
-alembic/           # Database migrations
-├── versions/      # Migration scripts
-└── env.py         # Alembic environment configuration
+alembic/                # Database migrations
+├── versions/           # Migration scripts
+└── env.py              # Alembic environment configuration
 
-streamlit/         # Streamlit client applications
-├── client_text.py   # Text chatbot interface
-├── client_audio.py  # Audio generation interface
-└── client_image.py  # Image generation interface
+streamlit/              # Streamlit client applications
+├── client_text.py      # Text chatbot interface
+├── client_audio.py     # Audio generation interface
+└── client_image.py     # Image generation interface
 ```
 
 ## API Endpoints
+
+### Authentication
+
+#### Register User
+```
+POST /auth/register
+Body: {"email": "user@example.com", "password": "securepassword"}
+```
+Creates a new user account with hashed password.
+
+**Response:**
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "created_at": "2025-12-31T10:00:00Z"
+}
+```
+
+#### Login
+```
+POST /auth/login
+Body: {"email": "user@example.com", "password": "securepassword"}
+```
+Authenticates user and returns JWT access token.
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+#### Get Current User
+```
+GET /auth/me
+Headers: Authorization: Bearer <access_token>
+```
+Retrieves the currently authenticated user's information.
 
 ### Conversation Management
 
@@ -364,6 +420,9 @@ Key dependencies include:
 - SQLAlchemy 2.0+ for async ORM
 - Alembic for database migrations
 - psycopg (PostgreSQL driver) for database connectivity
+- PyJWT for JWT token generation and validation
+- passlib[bcrypt] for password hashing
+- python-multipart for form data handling
 - Transformers & Diffusers for model inference
 - PyTorch for deep learning operations
 - Qdrant Client for vector database operations
@@ -380,12 +439,20 @@ See [pyproject.toml](pyproject.toml) for complete dependency list.
 
 ### Database Schema
 
-The application uses two main tables:
+The application uses three main tables:
+
+**Users Table:**
+- `id`: Primary key
+- `email`: User email (unique)
+- `hashed_password`: Bcrypt hashed password
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp
 
 **Conversations Table:**
 - `id`: Primary key
 - `title`: Conversation title
 - `model_type`: AI model used (e.g., "tinyLlama")
+- `user_id`: Foreign key to users (optional, for future user-conversation association)
 - `created_at`: Creation timestamp
 - `updated_at`: Last update timestamp
 
@@ -439,20 +506,48 @@ alembic downgrade <revision_id>
 - The app no longer uses `Base.metadata.create_all()` - all schema changes are managed through migrations
 - Migrations run synchronously while the app uses async SQLAlchemy for queries
 
-### Repository Pattern
+### Modular Architecture & Repository Pattern
 
-The codebase implements the Repository pattern for clean separation of concerns:
+The codebase implements a modular architecture with the Repository pattern for clean separation of concerns:
 
-- **Entities** ([database/entities.py](building_genai_services/database/entities.py)): SQLAlchemy ORM models
-- **Repositories** ([database/repositories/](building_genai_services/database/repositories/)): Data access layer with CRUD operations
-- **Services** ([database/services/](building_genai_services/database/services/)): Business logic layer
-- **Routers** ([routers/conversations.py](building_genai_services/routers/conversations.py)): API endpoint handlers
+**Shared Components:**
+- **Entities** ([common/entities/entities.py](building_genai_services/common/entities/entities.py)): SQLAlchemy ORM models (User, Conversation, Message)
+- **Interfaces** ([common/interfaces/interfaces.py](building_genai_services/common/interfaces/interfaces.py)): Repository interface definitions
+- **Session** ([common/session/session.py](building_genai_services/common/session/session.py)): Database session management and factory
+
+**Domain Modules** (following consistent pattern):
+- **Auth Module** ([auth/](building_genai_services/auth/)): User authentication and authorization
+  - `router.py`: Auth endpoints
+  - `services.py`: JWT and password hashing logic
+  - `repositories.py`: User data access
+  - `schemas.py`: Request/response models
+  - `exceptions.py`: Auth-specific exceptions
+
+- **Conversations Module** ([conversations/](building_genai_services/conversations/)): Conversation management
+  - `router.py`: Conversation CRUD endpoints
+  - `services.py`: Business logic
+  - `repository.py`: Data access layer
+  - `schemas.py`: Request/response models
+
+- **Generate Module** ([generate/](building_genai_services/generate/)): AI model generation
+  - `router.py`: Generation endpoints
+  - `models.py`: Model loading and inference
+  - `schemas.py`: Request/response models
+  - `utils.py`: Media processing utilities
+
+- **RAG Module** ([rag/](building_genai_services/rag/)): Document retrieval system
+  - `upload.py`: PDF upload endpoint
+  - `services.py`: Vector storage service
+  - `repository.py`: Qdrant operations
+  - `transform.py`, `extractor.py`, `scraper.py`: Processing utilities
 
 This architecture provides:
 - Clear separation between data access and business logic
+- Domain-driven module organization
 - Easy testing through dependency injection
 - Reusable repository methods across different services
 - Type-safe database operations with async SQLAlchemy
+- Shared components for cross-cutting concerns
 
 ## Development
 
@@ -461,10 +556,12 @@ The project uses:
 - Async/await patterns for non-blocking I/O
 - SQLAlchemy 2.0+ async ORM with PostgreSQL
 - Alembic for database schema versioning
+- Modular architecture with domain-driven design
 - Repository pattern for clean architecture
+- JWT-based authentication with secure password hashing
 - Context managers for model lifecycle management
 - Middleware for cross-cutting concerns (monitoring, logging)
-- Dependency injection for database sessions
+- Dependency injection for database sessions and services
 
 ## License
 

@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from .entities import Base
+from building_genai_services.common.entities import Base
 
 database_url = "postgresql+psycopg://fastapi:mysecretpassword@localhost:5432/backend_db"
 engine = create_async_engine(database_url, echo=True)

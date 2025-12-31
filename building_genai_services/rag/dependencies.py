@@ -1,7 +1,7 @@
 from fastapi import Body
 from loguru import logger
 
-from building_genai_services.schemas import TextModelRequest
+from building_genai_services.generate.schemas import TextModelRequest
 
 from .scraper import extract_urls, fetch_all
 from .services import vector_service

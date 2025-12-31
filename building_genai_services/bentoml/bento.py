@@ -1,6 +1,6 @@
 import bentoml
 
-from building_genai_services.models import load_image_model
+from building_genai_services.generate import load_image_model
 
 
 @bentoml.service(

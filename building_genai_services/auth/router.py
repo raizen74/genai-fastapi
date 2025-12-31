@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from building_genai_services.database import DBSessionDep
+from building_genai_services.common.session import DBSessionDep
 
 from .schemas import TokenOut, UserCreate, UserOut
 from .services import AuthHeaderDep, AuthService, LoginFormDep
@@ -13,6 +13,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def get_auth_service(session: DBSessionDep) -> AuthService:
     """Dependency to create AuthService with database session."""
     return AuthService(session)
+
 
 # FastAPI creates a NEW AuthService instance for EVERY request and injects it as a controller argument
 # This is actually the correct and recommended pattern because:

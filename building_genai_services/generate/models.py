@@ -11,7 +11,7 @@ from loguru import logger
 from PIL import Image
 from transformers import AutoModel, AutoProcessor, BarkModel, BarkProcessor, Pipeline, pipeline
 
-from building_genai_services.schemas import VoicePresets
+from .schemas import VoicePresets
 
 # Logic updated for Apple Silicon (MPS)
 if torch.backends.mps.is_available():

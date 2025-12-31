@@ -9,9 +9,8 @@ from pydantic import UUID4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from building_genai_services.database import DBSessionDep
+from building_genai_services.common.entities import User
 
-from .entities import User
 from .exceptions import AlreadyRegisteredException, UnauthorizedException
 from .repositories import TokenRepository
 from .schemas import TokenCreate, TokenUpdate, UserCreate, UserInDB
@@ -100,7 +99,7 @@ AuthHeaderDep = Annotated[HTTPAuthorizationCredentials, Depends(security)]
 
 
 class AuthService:
-    def __init__(self, session: DBSessionDep):
+    def __init__(self, session: AsyncSession) -> None:
         self.password_service = PasswordService()
         self.token_service = TokenService(session)
         self.user_service = UserService(session)
