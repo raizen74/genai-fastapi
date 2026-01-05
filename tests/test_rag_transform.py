@@ -1,3 +1,4 @@
+import aiohttp
 import openai
 import pytest
 
@@ -84,12 +85,14 @@ def calculate_precision(expected: list[int], retrieved: list[int]) -> int:
     ],
 )
 def test_retrieval_subsystem(db_client, query_vector, expected_ids):
+    """Integration test for the retrieval subsystem."""
     response = db_client.query_points(
         collection_name="test",
         query=query_vector,
         limit=3,
     )
-    retrieved_ids = [point[1][0].id for point in response]
+    print(f"{[p for p in response] = }")
+    retrieved_ids = [point.id for point in response.points]
     recall = calculate_recall(expected_ids, retrieved_ids)
     precision = calculate_precision(expected_ids, retrieved_ids)
     assert recall >= 0.66
@@ -97,11 +100,19 @@ def test_retrieval_subsystem(db_client, query_vector, expected_ids):
 
 
 # @pytest.mark.asyncio
-# async def test_upload_file(test_client, db_client):
-#     file_data = {"file": ("test.txt", b"Test file content", "text/plain")}
-#     # response = await test_client.post("/generate/upload", files=file_data)
-#     # assert response.status_code == 200
-#     points = await db_client.search(
+# async def test_upload_file_and_retrieve(test_client, async_db_client):
+#     """e2e test for file upload endpoint. The test needs to be fixed."""
+#     pdf_bytes = b"""%PDF-1.4 (test client) %%EOF"""
+#     form = aiohttp.FormData()
+#     form.add_field(
+#         "file",
+#         pdf_bytes,
+#         filename="test.pdf",
+#         content_type="application/pdf",
+#     )
+#     async with test_client.post("http://localhost:8000/generate/upload", data=form) as response:
+#         assert response.status == 200
+#     points = await async_db_client.search(
 #         collection_name="collection",
 #         query_vector="test content",
 #         limit=1,
