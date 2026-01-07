@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - main
 env:
   PYTHON_VERSION: "3.10"
 
